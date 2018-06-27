@@ -4,12 +4,15 @@
   "dependencies": {
     "koa": "^2.2.0",
     "koa-bodyparser": "^4.2.0",
-    "koa-request": "^1.0.0"
+    "koa-logger": "^2.0.1",
+    "koa-request": "^1.0.0",
+    "md5": "^2.2.1"
   },
   "now": {
     "alias": "element-issue-bot",
     "env": {
-      "BOT_TOKEN": "@github-bot-token"
+      "BOT_TOKEN": "@github-bot-token",
+      "TRANSLATION_KEY": "@baidu-translation-key"
     }
   },
   "scripts": {

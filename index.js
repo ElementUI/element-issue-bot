@@ -1,65 +1,82 @@
 const Koa = require('koa')
 const bodyParser = require('koa-bodyparser')()
-const request = require('koa-request')
+const logger = require('koa-logger')
 
-const headers = require('./consts').headers
 const comments = require('./consts').comment
-const isChinese = require('./utils').isChinese
-const isValid = require('./utils').isValid
-const commentIssue = require('./github').commentIssue
-const closeIssue = require('./github').closeIssue
+const { addAssignees, translate, referToFaq, notifyEmptyFiddle } = require('./service')
+const util = require('./utils')
+const github = require('./github')
 
 const app = new Koa()
 
+app.use(logger())
 app.use(bodyParser)
 
 app.use(async (ctx, next) => {
   const { action, issue } = ctx.request.body
   if (!issue) {
     ctx.body = 'This is not an issue.'
-  } else if (action !== 'opened') {
+    return
+  }
+
+  if (action === 'labeled') {
+    await addAssignees(ctx, issue)
+    return
+  }
+
+  if (action !== 'opened') {
     ctx.body = `This issue is ${ action }, so it does not need to be processed.`
-  } else if (isValid(issue)) {
+    return
+  }
+
+  if (util.isValid(issue)) {
     ctx.body = 'This is a valid issue.'
-  } else {
+
+    if (util.isChinese(issue)) {
+      await translate(ctx, issue)
+    }
+
+    if (util.isKeyEvent(issue) || util.isIconDemand(issue)) {
+      await referToFaq(ctx, issue)
+    } else if (util.isInvalidFiddle(issue)) {
+      await notifyEmptyFiddle(ctx, issue)
+    }
+    return
+  }
+
+  ctx.body = 'This issue is invalid.'
+  await next()
+})
+
+app.use(async (ctx, next) => {
+  const { issue } = ctx.request.body
+  const comment = comments.close.en
+  try {
+    await github.commentIssue(issue, comment)
     await next()
+  } catch(e) {
+    ctx.body += ` Error occurred when commenting: ${ e.statusCode }`
   }
 })
 
 app.use(async (ctx, next) => {
   const { issue } = ctx.request.body
-
-  let comment = comments.en
-  if (isChinese(issue)) {
-    comment = comments.cn
-  }
-  const options = {
-    url: `https://api.github.com/repos/elemefe/element/issues/${ issue.number }/comments`,
-    headers,
-    body: `{"body": "${ comment }"}`
-  }
-  
+  const labels = '["invalid"]'
   try {
-    await commentIssue(options)
+    await github.addLabels(issue, labels)
     await next()
   } catch(e) {
-    ctx.body = `Error occurred when commenting! Code: ${ e.statusCode }`
+    ctx.body += ` Error occurred when adding labels: ${ e.statusCode }`
   }
 })
 
 app.use(async ctx => {
-  const number = ctx.request.body.issue.number
-  const options = {
-    url: `https://api.github.com/repos/elemefe/element/issues/${ number }`,
-    headers,
-    body: '{"state": "closed"}'
-  }
-  
+  const { issue } = ctx.request.body
   try {
-    await closeIssue(options)
-    ctx.body = 'Success!'
+    await github.closeIssue(issue)
+    ctx.body += ' Closed successfully.'
   } catch(e) {
-    ctx.body = `Error occurred when closing! Code: ${ e.statusCode }`
+    ctx.body += ` Error occurred when closing: ${ e.statusCode }`
   }
 })
 
