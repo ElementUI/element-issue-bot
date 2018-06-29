@@ -26,7 +26,7 @@ module.exports = {
   },
 
   translate: text => {
-    const appid = '20170422000045423'
+    const appid = '20180629000181417'
     const key = process.env.TRANSLATION_KEY
     const salt = Math.round(new Date().getTime() / 1000)
     const sign = md5(appid + text + salt + key)

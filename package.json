@@ -9,7 +9,7 @@
     "md5": "^2.2.1"
   },
   "now": {
-    "alias": "element-issue-bot",
+    "alias": "element-bot",
     "env": {
       "BOT_TOKEN": "@github-bot-token",
       "TRANSLATION_KEY": "@baidu-translation-key"
